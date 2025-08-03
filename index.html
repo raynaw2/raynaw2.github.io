@@ -45,6 +45,75 @@
 
  <script>
    // Scene management
+   // Global league mappings for club classification
+   const leagueMapping = {
+     "Manchester United": "Premier League",
+     "Manchester City": "Premier League", 
+     "Liverpool": "Premier League",
+     "Chelsea": "Premier League",
+     "Arsenal": "Premier League",
+     "Tottenham Hotspur": "Premier League",
+     "Leicester City": "Premier League",
+     "West Ham United": "Premier League",
+     "Everton": "Premier League",
+     "Aston Villa": "Premier League",
+     "Newcastle United": "Premier League",
+     "Leeds United": "Premier League",
+     "Brighton & Hove Albion": "Premier League",
+     "Crystal Palace": "Premier League",
+     "Southampton": "Premier League",
+     "Wolverhampton Wanderers": "Premier League",
+     
+     "Real Madrid CF": "La Liga",
+     "FC Barcelona": "La Liga",
+     "Atlético de Madrid": "La Liga",
+     "Sevilla FC": "La Liga",
+     "Real Sociedad": "La Liga",
+     "Valencia CF": "La Liga",
+     "Villarreal CF": "La Liga",
+     "Athletic Club": "La Liga",
+     "Real Betis": "La Liga",
+     
+     "FC Bayern München": "Bundesliga",
+     "Borussia Dortmund": "Bundesliga",
+     "RB Leipzig": "Bundesliga",
+     "Bayer 04 Leverkusen": "Bundesliga",
+     "Borussia Mönchengladbach": "Bundesliga",
+     "VfL Wolfsburg": "Bundesliga",
+     "Eintracht Frankfurt": "Bundesliga",
+     "TSG 1899 Hoffenheim": "Bundesliga",
+     "1. FC Union Berlin": "Bundesliga",
+     "VfB Stuttgart": "Bundesliga",
+     
+     "Juventus": "Serie A",
+     "AC Milan": "Serie A",
+     "Inter": "Serie A",
+     "SSC Napoli": "Serie A",
+     "AS Roma": "Serie A",
+     "Atalanta": "Serie A",
+     "Lazio": "Serie A",
+     "ACF Fiorentina": "Serie A",
+     "Torino FC": "Serie A",
+     "Sassuolo": "Serie A",
+     
+     "Paris Saint-Germain": "Ligue 1",
+     "Olympique de Marseille": "Ligue 1",
+     "AS Monaco": "Ligue 1",
+     "Olympique Lyonnais": "Ligue 1",
+     "LOSC Lille": "Ligue 1",
+     "Stade Rennais FC": "Ligue 1",
+     "OGC Nice": "Ligue 1"
+   };
+
+   // Global league color mapping
+   const leagueColors = {
+     "Premier League": "#38003c",
+     "La Liga": "#ff6600", 
+     "Bundesliga": "#d20515",
+     "Serie A": "#004c99",
+     "Ligue 1": "#1e3a8a"
+   };
+
    // Scene management variables
    let currentScene = 1;
    const totalScenes = 3;
@@ -622,66 +691,6 @@
 
      const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
 
-     // League mappings for club classification
-     const leagueMapping = {
-       "Manchester United": "Premier League",
-       "Manchester City": "Premier League", 
-       "Liverpool": "Premier League",
-       "Chelsea": "Premier League",
-       "Arsenal": "Premier League",
-       "Tottenham Hotspur": "Premier League",
-       "Leicester City": "Premier League",
-       "West Ham United": "Premier League",
-       "Everton": "Premier League",
-       "Aston Villa": "Premier League",
-       "Newcastle United": "Premier League",
-       "Leeds United": "Premier League",
-       "Brighton & Hove Albion": "Premier League",
-       "Crystal Palace": "Premier League",
-       "Southampton": "Premier League",
-       "Wolverhampton Wanderers": "Premier League",
-       
-       "Real Madrid CF": "La Liga",
-       "FC Barcelona": "La Liga",
-       "Atlético de Madrid": "La Liga",
-       "Sevilla FC": "La Liga",
-       "Real Sociedad": "La Liga",
-       "Valencia CF": "La Liga",
-       "Villarreal CF": "La Liga",
-       "Athletic Club": "La Liga",
-       "Real Betis": "La Liga",
-       
-       "FC Bayern München": "Bundesliga",
-       "Borussia Dortmund": "Bundesliga",
-       "RB Leipzig": "Bundesliga",
-       "Bayer 04 Leverkusen": "Bundesliga",
-       "Borussia Mönchengladbach": "Bundesliga",
-       "VfL Wolfsburg": "Bundesliga",
-       "Eintracht Frankfurt": "Bundesliga",
-       "TSG 1899 Hoffenheim": "Bundesliga",
-       "1. FC Union Berlin": "Bundesliga",
-       "VfB Stuttgart": "Bundesliga",
-       
-       "Juventus": "Serie A",
-       "AC Milan": "Serie A",
-       "Inter": "Serie A",
-       "SSC Napoli": "Serie A",
-       "AS Roma": "Serie A",
-       "Atalanta": "Serie A",
-       "Lazio": "Serie A",
-       "ACF Fiorentina": "Serie A",
-       "Torino FC": "Serie A",
-       "Sassuolo": "Serie A",
-       
-       "Paris Saint-Germain": "Ligue 1",
-       "Olympique de Marseille": "Ligue 1",
-       "AS Monaco": "Ligue 1",
-       "Olympique Lyonnais": "Ligue 1",
-       "LOSC Lille": "Ligue 1",
-       "Stade Rennais FC": "Ligue 1",
-       "OGC Nice": "Ligue 1"
-     };
-
      const top105Players = data
        .sort((a, b) => b.Overall - a.Overall)
        .slice(0, 105)
@@ -710,10 +719,10 @@
        .domain([0, d3.max(leagueData, d => d.count)])
        .range([height, 0]);
 
-     // Color scale for leagues
+     // Use global league color mapping
      const colorScale = d3.scaleOrdinal()
-       .domain(["Premier League", "La Liga", "Bundesliga", "Serie A", "Ligue 1"])
-       .range(["#38003c", "#ff6600", "#d20515", "#004c99", "#1e3a8a"]);
+       .domain(Object.keys(leagueColors))
+       .range(Object.values(leagueColors));
 
      // Create bars
      const bars = g.selectAll("rect")
@@ -1241,6 +1250,10 @@
      const modal = document.getElementById('playerModal');
      const modalContent = document.getElementById('modalContent');
      
+     // Get player's league and color
+     const playerLeague = leagueMapping[player.Club] || 'Other';
+     const leagueColor = leagueColors[playerLeague] || '#3498db';
+     
      // Format player value
      const formatValue = (value) => {
        if (value >= 1000000) {
@@ -1256,6 +1269,7 @@
        <div style="text-align: center; margin-bottom: 25px;">
          <h2 style="margin: 0; color: #2c3e50; font-size: 28px;">${player.Name}</h2>
          <p style="margin: 5px 0; color: #7f8c8d; font-size: 16px;">${player.Club}</p>
+         <p style="margin: 5px 0; color: ${leagueColor}; font-size: 18px; font-weight: bold;">${playerLeague}</p>
        </div>
        
        <div style="display: flex; justify-content: space-around; margin-bottom: 25px;">
@@ -1287,6 +1301,7 @@
            <div>
              <p style="margin: 5px 0;"><strong>Market Value:</strong> ${formatValue(player.Value)}</p>
              <p style="margin: 5px 0;"><strong>Nationality:</strong> ${player.Nationality || 'Unknown'}</p>
+             <p style="margin: 5px 0;"><strong>League:</strong> <span style="color: ${leagueColor}; font-weight: bold;">${playerLeague}</span></p>
            </div>
            <div>
              <p style="margin: 5px 0;"><strong>Height:</strong> ${player.Height || 'Unknown'}</p>
