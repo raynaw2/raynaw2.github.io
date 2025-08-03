@@ -22,7 +22,6 @@
    <div style="background-color: white; margin: 5% auto; padding: 30px; border-radius: 15px; width: 80%; max-width: 600px; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.3); animation: modalSlideIn 0.3s ease-out;">
      <span id="closeModal" style="color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; line-height: 1;">&times;</span>
      <div id="modalContent" style="font-family: Arial, sans-serif;">
-       <!-- Modal content will be populated by JavaScript -->
      </div>
    </div>
  </div>
@@ -160,11 +159,11 @@
 
    // Scene 1: Player rating distribution histogram
    function createScene1(data) {
-     const margin = {top: 180, right: 70, bottom: 110, left: 110};
-     const width = 1200 - margin.left - margin.right;
+     const margin = {top: 150, right: 50, bottom: 100, left: 80};
+     const width = 1400 - margin.left - margin.right;
      const height = 700 - margin.top - margin.bottom;
 
-     const svg = d3.select("#scene1").append("svg").attr("width", 1200).attr("height", 700);
+     const svg = d3.select("#scene1").append("svg").attr("width", 1400).attr("height", 700);
      const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
 
      const overallRatings = data.map(d => +d.Overall);
@@ -197,11 +196,27 @@
        .attr("fill", d => colorScale((d.x0 + d.x1) / 2))
        .attr("stroke", "none")
        .attr("stroke-width", 2)
+       .style("cursor", "pointer");
+
+     // Add invisible overlay rectangles for better hover detection
+     g.selectAll(".hover-overlay")
+       .data(histogram)
+       .enter()
+       .append("rect")
+       .attr("class", "hover-overlay")
+       .attr("x", d => xScale(d.x0))
+       .attr("y", 0)
+       .attr("width", d => xScale(d.x1) - xScale(d.x0) - 2)
+       .attr("height", height)
+       .attr("fill", "transparent")
        .style("cursor", "pointer")
        .on("mouseover", function(event, d) {
          console.log("Bar mouseover triggered", d);
          
-         d3.select(this)
+         // Find the corresponding bar and highlight it
+         const barIndex = histogram.indexOf(d);
+         d3.selectAll(".bar")
+           .filter((barData, i) => i === barIndex)
            .transition()
            .duration(200)
            .attr("stroke", "black")
@@ -252,10 +267,13 @@
            .style("left", (event.pageX + 15) + "px")
            .style("top", (event.pageY - 10) + "px");
        })
-       .on("mouseout", function() {
+       .on("mouseout", function(event, d) {
          console.log("Bar mouseout triggered");
          
-         d3.select(this)
+         // Find the corresponding bar and remove highlight
+         const barIndex = histogram.indexOf(d);
+         d3.selectAll(".bar")
+           .filter((barData, i) => i === barIndex)
            .transition()
            .duration(200)
            .attr("stroke", "none")
