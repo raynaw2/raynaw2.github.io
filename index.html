@@ -1,0 +1,1295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ <title>FIFA 22</title>
+ <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+ <div style="text-align: center; margin: 20px 0; display: flex; align-items: center; justify-content: center; gap: 20px;">
+   <img src="fifa22logo.png" alt="FIFA 22 Logo" style="height: 60px; width: auto;">
+   <h1 style="font-family: Arial, sans-serif; margin: 0; color: #2c3e50;">Player Ratings</h1>
+ </div>
+ <div id="scene1" style="text-align: center;"></div>
+ <div id="selection-info" style="width: 1200px; margin: 20px auto 0 auto; padding: 15px; background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; font-family: Arial, sans-serif; text-align: center; min-height: 20px; box-sizing: border-box; display: none;"></div>
+
+ <!-- Tooltip for bar details -->
+ <div id="tooltip" style="position: absolute; text-align: left; padding: 12px; font-family: Arial, sans-serif; font-size: 14px; background: rgba(0, 0, 0, 0.9); color: white; border-radius: 8px; pointer-events: none; opacity: 0; transition: opacity 0.3s; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3); z-index: 1000; min-width: 200px;"></div>
+
+ <!-- Player Modal -->
+ <div id="playerModal" style="display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.8); backdrop-filter: blur(5px);">
+   <div style="background-color: white; margin: 5% auto; padding: 30px; border-radius: 15px; width: 80%; max-width: 600px; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.3); animation: modalSlideIn 0.3s ease-out;">
+     <span id="closeModal" style="color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; line-height: 1;">&times;</span>
+     <div id="modalContent" style="font-family: Arial, sans-serif;">
+       <!-- Modal content will be populated by JavaScript -->
+     </div>
+   </div>
+ </div>
+
+ <style>
+   @keyframes modalSlideIn {
+     from { transform: translateY(-50px); opacity: 0; }
+     to { transform: translateY(0); opacity: 1; }
+   }
+   .player-card {
+     cursor: pointer;
+     transition: all 0.3s ease;
+   }
+ </style>
+
+ <!-- Navigation arrows at bottom -->
+ <div style="width: 1200px; margin: 20px auto; display: flex; justify-content: space-between; align-items: center; padding: 0 50px;">
+   <img id="prevArrow" src="arrow.png" alt="Previous" style="height: 80px; width: auto; transform: rotate(180deg); cursor: pointer; opacity: 0.7; transition: opacity 0.3s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">
+   <img id="nextArrow" src="arrow.png" alt="Next" style="height: 80px; width: auto; cursor: pointer; opacity: 0.7; transition: opacity 0.3s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">
+ </div>
+
+ <script>
+   // Scene management
+   // Scene management variables
+   let currentScene = 1;
+   const totalScenes = 3;
+   let data;
+
+   // Navigation functions
+   function nextScene() {
+     if (currentScene < totalScenes) {
+       currentScene++;
+       transitionToScene(currentScene);
+     }
+   }
+
+   function prevScene() {
+     if (currentScene > 1) {
+       currentScene--;
+       transitionToScene(currentScene);
+     }
+   }
+
+   function transitionToScene(sceneNumber) {
+     // Clear current scene and initialize new one
+     d3.select("#scene1").selectAll("*").remove();
+     d3.select("#selection-info").style("display", "none");
+     d3.select("#tooltip").style("opacity", 0);
+     
+     // Create the new scene based on scene number
+     switch(sceneNumber) {
+       case 1:
+         createScene1(data);
+         break;
+       case 2:
+         createScene2(data);
+         break;
+       case 3:
+         createScene3(data);
+         break;
+     }
+     
+     updateArrowVisibility();
+   }
+
+   function updateArrowVisibility() {
+     const prevArrow = document.getElementById('prevArrow');
+     const nextArrow = document.getElementById('nextArrow');
+     
+     // Update arrow states based on current scene
+     prevArrow.style.opacity = currentScene > 1 ? '0.7' : '0.3';
+     prevArrow.style.cursor = currentScene > 1 ? 'pointer' : 'default';
+     
+     nextArrow.style.opacity = currentScene < totalScenes ? '0.7' : '0.3';
+     nextArrow.style.cursor = currentScene < totalScenes ? 'pointer' : 'default';
+   }
+
+   // Add event listeners for modal and navigation
+   document.addEventListener('DOMContentLoaded', function() {
+     // Modal event handlers
+     const modal = document.getElementById('playerModal');
+     const closeBtn = document.getElementById('closeModal');
+     
+     // Close modal events
+     if (closeBtn) {
+       closeBtn.onclick = function() {
+         modal.style.display = 'none';
+       };
+     }
+     
+     window.onclick = function(event) {
+       if (event.target === modal) {
+         modal.style.display = 'none';
+       }
+     };
+     
+     document.addEventListener('keydown', function(event) {
+       if (event.key === 'Escape' && modal.style.display === 'block') {
+         modal.style.display = 'none';
+       }
+     });
+     
+     // Navigation event handlers
+     document.getElementById('prevArrow').addEventListener('click', prevScene);
+     document.getElementById('nextArrow').addEventListener('click', nextScene);
+     updateArrowVisibility();
+   });
+
+   // Dataset loading and initialization
+   const dataPath = "fifa22.csv";
+
+   d3.csv(dataPath).then(function(loadedData) {
+     data = loadedData;
+     
+     console.log("Dataset loaded:", data);
+
+     processData(data);
+     createScene1(data);
+     updateArrowVisibility();
+   }).catch(function(error) {
+     console.error("Error loading the dataset:", error);
+   });
+
+   // Data processing function
+   function processData(data) {
+     data.forEach(player => {
+       player.Overall = +player.Overall;
+       player.Age = +player.Age;
+       player.Value = parseValue(player.Value);
+     });
+
+     const topPlayers = data.sort((a, b) => b.Overall - a.Overall).slice(0, 105);
+     console.log("Top 105 Players:", topPlayers);
+   }
+
+   // Scene 1: Player rating distribution histogram
+   function createScene1(data) {
+     const margin = {top: 180, right: 70, bottom: 110, left: 110};
+     const width = 1200 - margin.left - margin.right;
+     const height = 700 - margin.top - margin.bottom;
+
+     const svg = d3.select("#scene1").append("svg").attr("width", 1200).attr("height", 700);
+     const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+     const overallRatings = data.map(d => +d.Overall);
+
+     const histogram = d3.bin().thresholds(10)(overallRatings);
+
+     const xScale = d3.scaleLinear()
+       .domain([40, 100])
+       .range([0, width]);
+
+     const yScale = d3.scaleLinear()
+       .domain([0, d3.max(histogram, d => d.length)])
+       .range([height, 0]);
+
+     // Create color scale from red to green based on rating
+     const colorScale = d3.scaleLinear()
+       .domain([40, 70, 100])
+       .range(["red", "yellow", "green"]);
+
+     // Create bars
+     g.selectAll("rect")
+       .data(histogram)
+       .enter()
+       .append("rect")
+       .attr("class", "bar")
+       .attr("x", d => xScale(d.x0))
+       .attr("y", d => yScale(d.length))
+       .attr("width", d => xScale(d.x1) - xScale(d.x0) - 2)
+       .attr("height", d => height - yScale(d.length))
+       .attr("fill", d => colorScale((d.x0 + d.x1) / 2))
+       .attr("stroke", "none")
+       .attr("stroke-width", 2)
+       .style("cursor", "pointer")
+       .on("mouseover", function(event, d) {
+         console.log("Bar mouseover triggered", d);
+         
+         d3.select(this)
+           .transition()
+           .duration(200)
+           .attr("stroke", "black")
+           .attr("stroke-width", 3)
+           .style("opacity", 0.8);
+
+         const playersInBin = data.filter(player => 
+           player.Overall >= d.x0 && player.Overall < d.x1
+         );
+         console.log("Players in bin:", playersInBin.length);
+         
+         const avgRating = playersInBin.length > 0 ? 
+           (playersInBin.reduce((sum, p) => sum + p.Overall, 0) / playersInBin.length).toFixed(1) : 
+           'N/A';
+         const percentage = ((playersInBin.length / data.length) * 100).toFixed(1);
+         
+         const topPlayersInRange = playersInBin
+           .sort((a, b) => b.Overall - a.Overall)
+           .slice(0, 3);
+         
+         const topPlayersText = topPlayersInRange.length > 0 ? 
+           topPlayersInRange.map(p => `${p.Name} (${p.Overall})`).join('<br>') : 
+           'No players in this range';
+
+         const tooltip = d3.select("#tooltip");
+         console.log("Tooltip element:", tooltip.node());
+         
+         tooltip.transition()
+           .duration(200)
+           .style("opacity", 1);
+           
+         tooltip.html(`
+           <strong>Rating Range: ${Math.round(d.x0)} - ${Math.round(d.x1)}</strong><br>
+           <strong>Players Count:</strong> ${d.length}<br>
+           <strong>Percentage:</strong> ${percentage}% of all players<br>
+           <strong>Average Rating:</strong> ${avgRating}<br>
+           <br>
+           <strong>Top Players in Range:</strong><br>
+           ${topPlayersText}
+         `)
+           .style("left", (event.pageX + 15) + "px")
+           .style("top", (event.pageY - 10) + "px");
+         
+         console.log("Tooltip positioned at:", event.pageX + 15, event.pageY - 10);
+       })
+       .on("mousemove", function(event) {
+         d3.select("#tooltip")
+           .style("left", (event.pageX + 15) + "px")
+           .style("top", (event.pageY - 10) + "px");
+       })
+       .on("mouseout", function() {
+         console.log("Bar mouseout triggered");
+         
+         d3.select(this)
+           .transition()
+           .duration(200)
+           .attr("stroke", "none")
+           .attr("stroke-width", 2)
+           .style("opacity", 1);
+
+         d3.select("#tooltip")
+           .transition()
+           .duration(200)
+           .style("opacity", 0);
+       });
+
+     // Statistical calculations and annotations
+     const majorityStart = 60;
+     const majorityEnd = 75;
+     const majorityPlayersCount = data.filter(player => 
+       player.Overall >= majorityStart && player.Overall <= majorityEnd
+     ).length;
+     const totalPlayers = data.length;
+     const majorityPercentage = ((majorityPlayersCount / totalPlayers) * 100).toFixed(1);
+
+     const eliteStart = 85;
+     const eliteEnd = 100;
+     const elitePlayersCount = data.filter(player => 
+       player.Overall >= eliteStart && player.Overall <= eliteEnd
+     ).length;
+     const elitePercentage = ((elitePlayersCount / totalPlayers) * 100).toFixed(1);
+
+     // Majority range highlight overlay
+     const majorityHighlight = g.append("rect")
+       .attr("class", "majority-highlight")
+       .attr("x", xScale(majorityStart))
+       .attr("y", 0)
+       .attr("width", xScale(majorityEnd) - xScale(majorityStart))
+       .attr("height", height)
+       .attr("fill", "rgba(255, 165, 0, 0.3)")
+       .attr("stroke", "yellow")
+       .attr("stroke-width", 3)
+       .attr("stroke-dasharray", "10,5")
+       .style("pointer-events", "all")
+       .style("cursor", "pointer")
+       .style("opacity", 0)
+       .on("click", function() {
+         d3.select(this)
+           .transition()
+           .duration(300)
+           .style("opacity", 0)
+           .on("end", function() {
+             d3.select(this).style("pointer-events", "none");
+           });
+         
+         g.selectAll(".majority-annotation").remove();
+       });
+
+     // Elite range highlight overlay
+     const eliteHighlight = g.append("rect")
+       .attr("class", "elite-highlight")
+       .attr("x", xScale(eliteStart))
+       .attr("y", 0)
+       .attr("width", xScale(eliteEnd) - xScale(eliteStart))
+       .attr("height", height)
+       .attr("fill", "rgba(0, 255, 0, 0.3)")
+       .attr("stroke", "green")
+       .attr("stroke-width", 3)
+       .attr("stroke-dasharray", "10,5")
+       .style("pointer-events", "all")
+       .style("cursor", "pointer")
+       .style("opacity", 0)
+       .on("click", function() {
+         d3.select(this)
+           .transition()
+           .duration(500)
+           .style("opacity", 0)
+           .on("end", function() {
+             d3.select(this).style("pointer-events", "none");
+           });
+         
+         g.selectAll(".elite-annotation").remove();
+       });
+
+     // Add annotation text and arrow for majority range
+     const annotationGroup = g.append("g").attr("class", "majority-annotation").style("opacity", 0);
+     
+     // Add arrow line (positioned above the bars)
+     annotationGroup.append("line")
+       .attr("x1", xScale((majorityStart + majorityEnd) / 2))
+       .attr("y1", -40)
+       .attr("x2", xScale((majorityStart + majorityEnd) / 2))
+       .attr("y2", -10)
+       .attr("stroke", "darkred")
+       .attr("stroke-width", 2)
+       .attr("marker-end", "url(#arrowhead)");
+
+     // Add arrowhead marker
+     const defs = svg.append("defs");
+     defs.append("marker")
+       .attr("id", "arrowhead")
+       .attr("markerWidth", 10)
+       .attr("markerHeight", 7)
+       .attr("refX", 0)
+       .attr("refY", 3.5)
+       .attr("orient", "auto")
+       .append("polygon")
+       .attr("points", "0 0, 10 3.5, 0 7")
+       .attr("fill", "darkred");
+
+     // Add annotation text box (positioned above the arrow)
+     const annotationBox = annotationGroup.append("g");
+     
+     annotationBox.append("rect")
+       .attr("x", xScale((majorityStart + majorityEnd) / 2) - 100)
+       .attr("y", -120)
+       .attr("width", 200)
+       .attr("height", 80)
+       .attr("fill", "white")
+       .attr("stroke", "darkred")
+       .attr("stroke-width", 2)
+       .attr("rx", 5);
+
+     annotationBox.append("text")
+       .attr("x", xScale((majorityStart + majorityEnd) / 2))
+       .attr("y", -120 + 25)
+       .attr("text-anchor", "middle")
+       .style("font-size", "16px")
+       .style("font-weight", "bold")
+       .style("font-family", "Arial, sans-serif")
+       .style("fill", "darkred")
+       .text("Majority of Players");
+
+      annotationBox.append("text")
+       .attr("x", xScale((majorityStart + majorityEnd) / 2))
+       .attr("y", -120 + 45)
+       .attr("text-anchor", "middle")
+       .style("font-size", "14px")
+       .style("font-family", "Arial, sans-serif")
+       .style("fill", "black")
+       .text("Ratings 60-75");
+     
+       annotationBox.append("text")
+       .attr("x", xScale((majorityStart + majorityEnd) / 2))
+       .attr("y", -120 + 65)
+       .attr("text-anchor", "middle")
+       .style("font-size", "12px")
+       .style("font-family", "Arial, sans-serif")
+       .style("fill", "gray")
+       .text(`${majorityPlayersCount} players (${majorityPercentage}%)`);
+
+     // Add elite annotation text and arrow for best players range
+     const eliteAnnotationGroup = g.append("g").attr("class", "elite-annotation").style("opacity", 0);
+     
+     // Add arrow line for elite annotation (positioned above the bars)
+     eliteAnnotationGroup.append("line")
+       .attr("x1", xScale((eliteStart + eliteEnd) / 2))
+       .attr("y1", -40)
+       .attr("x2", xScale((eliteStart + eliteEnd) / 2))
+       .attr("y2", -10)
+       .attr("stroke", "darkgreen")
+       .attr("stroke-width", 2)
+       .attr("marker-end", "url(#elite-arrowhead)");
+
+     // Add elite arrowhead marker
+     defs.append("marker")
+       .attr("id", "elite-arrowhead")
+       .attr("markerWidth", 10)
+       .attr("markerHeight", 7)
+       .attr("refX", 0)
+       .attr("refY", 3.5)
+       .attr("orient", "auto")
+       .append("polygon")
+       .attr("points", "0 0, 10 3.5, 0 7")
+       .attr("fill", "darkgreen");
+
+     // Add elite annotation text box (positioned above the arrow)
+     const eliteAnnotationBox = eliteAnnotationGroup.append("g");
+     
+     eliteAnnotationBox.append("rect")
+       .attr("x", xScale((eliteStart + eliteEnd) / 2) - 100)
+       .attr("y", -120)
+       .attr("width", 200)
+       .attr("height", 80)
+       .attr("fill", "white")
+       .attr("stroke", "darkgreen")
+       .attr("stroke-width", 2)
+       .attr("rx", 5);
+
+     eliteAnnotationBox.append("text")
+       .attr("x", xScale((eliteStart + eliteEnd) / 2))
+       .attr("y", -120 + 25)
+       .attr("text-anchor", "middle")
+       .style("font-size", "16px")
+       .style("font-weight", "bold")
+       .style("font-family", "Arial, sans-serif")
+       .style("fill", "darkgreen")
+       .text("Elite Players");
+
+     eliteAnnotationBox.append("text")
+       .attr("x", xScale((eliteStart + eliteEnd) / 2))
+       .attr("y", -120 + 45)
+       .attr("text-anchor", "middle")
+       .style("font-size", "14px")
+       .style("font-family", "Arial, sans-serif")
+       .style("fill", "black")
+       .text("Ratings 85-100");
+     
+     eliteAnnotationBox.append("text")
+       .attr("x", xScale((eliteStart + eliteEnd) / 2))
+       .attr("y", -120 + 65)
+       .attr("text-anchor", "middle")
+       .style("font-size", "12px")
+       .style("font-family", "Arial, sans-serif")
+       .style("fill", "gray")
+       .text(`${elitePlayersCount} players (${elitePercentage}%)`);
+
+     // Add x-axis
+     const xAxis = d3.axisBottom(xScale).ticks(13).tickFormat(d => Math.round(d));
+     g.append("g")
+       .attr("transform", `translate(0,${height})`)
+       .call(xAxis)
+       .selectAll("text")
+       .style("font-size", "14px")
+       .style("font-family", "Arial, sans-serif");
+
+     // Add y-axis
+     const yAxis = d3.axisLeft(yScale);
+     g.append("g")
+       .call(yAxis)
+       .selectAll("text")
+       .style("font-size", "14px")
+       .style("font-family", "Arial, sans-serif");
+
+     // Add x-axis label
+     g.append("text")
+       .attr("transform", `translate(${width/2}, ${height + margin.bottom - 20})`)
+       .style("text-anchor", "middle")
+       .style("font-size", "18px")
+       .style("font-family", "Arial, sans-serif")
+       .text("Overall Rating");
+
+     // Add y-axis label
+     g.append("text")
+       .attr("transform", "rotate(-90)")
+       .attr("y", 0 - margin.left + 20)
+       .attr("x", 0 - (height / 2))
+       .style("text-anchor", "middle")
+       .style("font-size", "18px")
+       .style("font-family", "Arial, sans-serif")
+       .text("Number of Players");
+
+     // Add title
+     g.append("text")
+       .attr("x", width / 2)
+       .attr("y", 0 - (margin.top / 2) - 50)
+       .attr("text-anchor", "middle")
+       .style("font-size", "18px")
+       .style("font-weight", "bold")
+       .style("font-family", "Arial, sans-serif")
+       .text("Distribution of FIFA 22 Player Overall Ratings");
+
+     // Show highlight and annotation with transition after a delay
+     setTimeout(() => {
+       majorityHighlight
+         .style("pointer-events", "all")
+         .transition()
+         .duration(300)
+         .style("opacity", 1);
+       
+       // Fade in annotation at the same time
+       annotationGroup
+         .transition()
+         .duration(300)
+         .style("opacity", 1)
+         .on("end", function() {
+           // After 2 more seconds, move the first highlight and annotation off-screen
+           setTimeout(() => {
+             // Move majority highlight off-screen to the right
+             majorityHighlight
+               .transition()
+               .duration(1500)
+               .attr("transform", "translate(1500, 0)")
+               .style("opacity", 0);
+             
+             // Move majority annotation off-screen upward
+             annotationGroup
+               .transition()
+               .duration(1500)
+               .attr("transform", "translate(0, -300)")
+               .style("opacity", 0)
+               .on("end", function() {
+                 // After majority annotation fades out, show elite players annotation
+                 setTimeout(() => {
+                   eliteHighlight
+                     .style("pointer-events", "all")
+                     .transition()
+                     .duration(500)
+                     .style("opacity", 1);
+                   
+                   // Fade in elite annotation at the same time
+                   eliteAnnotationGroup
+                     .transition()
+                     .duration(500)
+                     .style("opacity", 1)
+                     .on("end", function() {
+                       // After 2 more seconds, move the elite highlight and annotation off-screen
+                       setTimeout(() => {
+                         // Move elite highlight off-screen to the right
+                         eliteHighlight
+                           .transition()
+                           .duration(1500)
+                           .attr("transform", "translate(1500, 0)")
+                           .style("opacity", 0);
+                         
+                         // Move elite annotation off-screen upward
+                         eliteAnnotationGroup
+                           .transition()
+                           .duration(1500)
+                           .attr("transform", "translate(0, -300)")
+                           .style("opacity", 0);
+                       }, 2000); // Wait 2 seconds after the elite highlight appears
+                     });
+                 }, 500); // Wait 0.5 seconds after majority annotation finishes moving
+               });
+           }, 2000); // Wait 2 seconds after the majority highlight appears
+         });
+     }, 800);
+   }
+
+   // Scene 2: League distribution analysis
+   function createScene2(data) {
+     const margin = {top: 300, right: 70, bottom: 120, left: 100}; 
+     const width = 1200 - margin.left - margin.right;
+     const height = 700 - margin.top - margin.bottom;
+
+     const svg = d3.select("#scene1").append("svg").attr("width", 1200).attr("height", 700);
+     
+     // Add the top5leagues image centered at the top
+     svg.append("image")
+       .attr("x", 400) 
+       .attr("y", -50)  
+       .attr("width", 400) 
+       .attr("height", 200)
+       .attr("href", "top5leagues.jpeg")
+       .style("opacity", 0)
+       .transition()
+       .duration(800)
+       .style("opacity", 1);
+
+     const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+     // League mappings for club classification
+     const leagueMapping = {
+       "Manchester United": "Premier League",
+       "Manchester City": "Premier League", 
+       "Liverpool": "Premier League",
+       "Chelsea": "Premier League",
+       "Arsenal": "Premier League",
+       "Tottenham Hotspur": "Premier League",
+       "Leicester City": "Premier League",
+       "West Ham United": "Premier League",
+       "Everton": "Premier League",
+       "Aston Villa": "Premier League",
+       "Newcastle United": "Premier League",
+       "Leeds United": "Premier League",
+       "Brighton & Hove Albion": "Premier League",
+       "Crystal Palace": "Premier League",
+       "Southampton": "Premier League",
+       "Wolverhampton Wanderers": "Premier League",
+       
+       "Real Madrid CF": "La Liga",
+       "FC Barcelona": "La Liga",
+       "Atlético de Madrid": "La Liga",
+       "Sevilla FC": "La Liga",
+       "Real Sociedad": "La Liga",
+       "Valencia CF": "La Liga",
+       "Villarreal CF": "La Liga",
+       "Athletic Club": "La Liga",
+       "Real Betis": "La Liga",
+       
+       "FC Bayern München": "Bundesliga",
+       "Borussia Dortmund": "Bundesliga",
+       "RB Leipzig": "Bundesliga",
+       "Bayer 04 Leverkusen": "Bundesliga",
+       "Borussia Mönchengladbach": "Bundesliga",
+       "VfL Wolfsburg": "Bundesliga",
+       "Eintracht Frankfurt": "Bundesliga",
+       "TSG 1899 Hoffenheim": "Bundesliga",
+       "1. FC Union Berlin": "Bundesliga",
+       "VfB Stuttgart": "Bundesliga",
+       
+       "Juventus": "Serie A",
+       "AC Milan": "Serie A",
+       "Inter": "Serie A",
+       "SSC Napoli": "Serie A",
+       "AS Roma": "Serie A",
+       "Atalanta": "Serie A",
+       "Lazio": "Serie A",
+       "ACF Fiorentina": "Serie A",
+       "Torino FC": "Serie A",
+       "Sassuolo": "Serie A",
+       
+       "Paris Saint-Germain": "Ligue 1",
+       "Olympique de Marseille": "Ligue 1",
+       "AS Monaco": "Ligue 1",
+       "Olympique Lyonnais": "Ligue 1",
+       "LOSC Lille": "Ligue 1",
+       "Stade Rennais FC": "Ligue 1",
+       "OGC Nice": "Ligue 1"
+     };
+
+     const top105Players = data
+       .sort((a, b) => b.Overall - a.Overall)
+       .slice(0, 105)
+       .filter(player => leagueMapping[player.Club]);
+
+     const playersByLeague = d3.group(top105Players, d => leagueMapping[d.Club]);
+     
+     // Convert to array format for D3
+     const leagueData = Array.from(playersByLeague, ([league, players]) => ({
+       league: league,
+       count: players.length,
+       avgRating: d3.mean(players, d => d.Overall).toFixed(1),
+       topPlayer: players.sort((a, b) => b.Overall - a.Overall)[0],
+       players: players
+     }));
+
+     console.log("League data:", leagueData);
+
+     // Create scales
+     const xScale = d3.scaleBand()
+       .domain(leagueData.map(d => d.league))
+       .range([0, width])
+       .padding(0.2);
+
+     const yScale = d3.scaleLinear()
+       .domain([0, d3.max(leagueData, d => d.count)])
+       .range([height, 0]);
+
+     // Color scale for leagues
+     const colorScale = d3.scaleOrdinal()
+       .domain(["Premier League", "La Liga", "Bundesliga", "Serie A", "Ligue 1"])
+       .range(["#38003c", "#ff6600", "#d20515", "#004c99", "#1e3a8a"]);
+
+     // Create bars
+     const bars = g.selectAll("rect")
+       .data(leagueData)
+       .enter()
+       .append("rect")
+       .attr("class", "league-bar")
+       .attr("x", d => xScale(d.league))
+       .attr("y", height)
+       .attr("width", xScale.bandwidth())
+       .attr("height", 0)
+       .attr("fill", d => colorScale(d.league))
+       .attr("stroke", "white")
+       .attr("stroke-width", 2)
+       .style("cursor", "pointer");
+
+     // Animate bars
+     bars.transition()
+       .duration(1000)
+       .delay((d, i) => i * 200)
+       .attr("y", d => yScale(d.count))
+       .attr("height", d => height - yScale(d.count));
+
+     // Add tooltips
+     bars.on("mouseover", function(event, d) {
+         console.log("League bar mouseover:", d.league);
+         
+         // Highlight the bar
+         d3.select(this)
+           .transition()
+           .duration(200)
+           .attr("stroke", "black")
+           .attr("stroke-width", 4)
+           .style("opacity", 0.8);
+
+         // Get top 3 players from this league
+         const topPlayersText = d.players
+           .sort((a, b) => b.Overall - a.Overall)
+           .slice(0, 3)
+           .map(p => `${p.Name} (${p.Overall}) - ${p.Club}`)
+           .join('<br>');
+
+         // Show tooltip
+         const tooltip = d3.select("#tooltip");
+         
+         tooltip.transition()
+           .duration(200)
+           .style("opacity", 1);
+           
+         tooltip.html(`
+           <strong>${d.league}</strong><br>
+           <strong>Top Players:</strong> ${d.count}<br>
+           <strong>Average Rating:</strong> ${d.avgRating}<br>
+           <strong>Best Player:</strong> ${d.topPlayer.Name} (${d.topPlayer.Overall})<br>
+           <br>
+           <strong>Top 3 Players:</strong><br>
+           ${topPlayersText}
+         `)
+           .style("left", (event.pageX + 15) + "px")
+           .style("top", (event.pageY - 10) + "px");
+       })
+       .on("mousemove", function(event) {
+         d3.select("#tooltip")
+           .style("left", (event.pageX + 15) + "px")
+           .style("top", (event.pageY - 10) + "px");
+       })
+       .on("mouseout", function() {
+         // Remove highlight from bar
+         d3.select(this)
+           .transition()
+           .duration(200)
+           .attr("stroke", "white")
+           .attr("stroke-width", 2)
+           .style("opacity", 1);
+
+         // Hide tooltip
+         d3.select("#tooltip")
+           .transition()
+           .duration(200)
+           .style("opacity", 0);
+       });
+
+     // Add value labels on top of bars
+     g.selectAll(".value-label")
+       .data(leagueData)
+       .enter()
+       .append("text")
+       .attr("class", "value-label")
+       .attr("x", d => xScale(d.league) + xScale.bandwidth() / 2)
+       .attr("y", height)
+       .attr("text-anchor", "middle")
+       .style("font-size", "16px")
+       .style("font-weight", "bold")
+       .style("font-family", "Arial, sans-serif")
+       .style("fill", "#2c3e50")
+       .text(d => d.count)
+       .transition()
+       .duration(1000)
+       .delay((d, i) => i * 200 + 500)
+       .attr("y", d => yScale(d.count) - 10);
+
+     // Add x-axis
+     const xAxis = d3.axisBottom(xScale);
+     g.append("g")
+       .attr("transform", `translate(0,${height})`)
+       .call(xAxis)
+       .selectAll("text")
+       .style("font-size", "14px")
+       .style("font-family", "Arial, sans-serif")
+       .style("font-weight", "bold");
+
+     // Add y-axis
+     const yAxis = d3.axisLeft(yScale);
+     g.append("g")
+       .call(yAxis)
+       .selectAll("text")
+       .style("font-size", "14px")
+       .style("font-family", "Arial, sans-serif");
+
+     // Add x-axis label
+     g.append("text")
+       .attr("transform", `translate(${width/2}, ${height + margin.bottom - 30})`)
+       .style("text-anchor", "middle")
+       .style("font-size", "18px")
+       .style("font-family", "Arial, sans-serif")
+       .style("font-weight", "bold")
+       .text("European Leagues");
+
+     // Add y-axis label
+     g.append("text")
+       .attr("transform", "rotate(-90)")
+       .attr("y", 0 - margin.left + 20)
+       .attr("x", 0 - (height / 2))
+       .style("text-anchor", "middle")
+       .style("font-size", "18px")
+       .style("font-family", "Arial, sans-serif")
+       .style("font-weight", "bold")
+       .text("Number of Top Players");
+
+     // Add title
+     g.append("text")
+       .attr("x", width / 2)
+       .attr("y", -180)
+       .attr("text-anchor", "middle")
+       .style("font-size", "22px")
+       .style("font-weight", "bold")
+       .style("font-family", "Arial, sans-serif")
+       .style("fill", "#2c3e50")
+       .text("Top 105 FIFA 22 Players by European League");
+
+     // Add subtitle
+     g.append("text")
+       .attr("x", width / 2)
+       .attr("y", -150) // Moved down from -190 to -95
+       .attr("text-anchor", "middle")
+       .style("font-size", "16px")
+       .style("font-family", "Arial, sans-serif")
+       .style("fill", "#7f8c8d")
+       .text("Distribution of elite players across Europe's top 5 leagues");
+
+     // Add annotations for team concentration insight
+     setTimeout(() => {
+       // Create annotation for concentrated leagues (Ligue 1 and Bundesliga)
+       const concentratedAnnotation = g.append("g")
+         .attr("class", "concentrated-annotation")
+         .style("opacity", 0);
+       
+       // Find positions for Ligue 1 and Bundesliga bars
+       const ligue1Data = leagueData.find(d => d.league === "Ligue 1");
+       const bundesligaData = leagueData.find(d => d.league === "Bundesliga");
+       
+       if (ligue1Data && bundesligaData) {
+         // Add connecting line between the two concentrated leagues
+         concentratedAnnotation.append("line")
+           .attr("x1", xScale("Ligue 1") + xScale.bandwidth()/2)
+           .attr("y1", yScale(ligue1Data.count) - 30)
+           .attr("x2", xScale("Bundesliga") + xScale.bandwidth()/2)
+           .attr("y2", yScale(bundesligaData.count) - 30)
+           .attr("stroke", "#e74c3c")
+           .attr("stroke-width", 3)
+           .attr("stroke-dasharray", "5,5");
+         
+         // Add annotation box for concentrated leagues
+         const concentratedBox = concentratedAnnotation.append("g");
+         const boxX = (xScale("Ligue 1") + xScale("Bundesliga") + xScale.bandwidth()) / 2 - 140;
+         const boxY = Math.min(yScale(ligue1Data.count), yScale(bundesligaData.count)) - 120;
+         
+         concentratedBox.append("rect")
+           .attr("x", boxX)
+           .attr("y", boxY)
+           .attr("width", 280)
+           .attr("height", 70)
+           .attr("fill", "white")
+           .attr("stroke", "#e74c3c")
+           .attr("stroke-width", 2)
+           .attr("rx", 8);
+         
+         concentratedBox.append("text")
+           .attr("x", boxX + 140)
+           .attr("y", boxY + 20)
+           .attr("text-anchor", "middle")
+           .style("font-size", "14px")
+           .style("font-weight", "bold")
+           .style("font-family", "Arial, sans-serif")
+           .style("fill", "#e74c3c")
+           .text("Team Concentration");
+         
+         concentratedBox.append("text")
+           .attr("x", boxX + 140)
+           .attr("y", boxY + 40)
+           .attr("text-anchor", "middle")
+           .style("font-size", "12px")
+           .style("font-family", "Arial, sans-serif")
+           .style("fill", "#2c3e50")
+           .text("Top 3 players come from");
+         
+         concentratedBox.append("text")
+           .attr("x", boxX + 140)
+           .attr("y", boxY + 55)
+           .attr("text-anchor", "middle")
+           .style("font-size", "12px")
+           .style("font-family", "Arial, sans-serif")
+           .style("fill", "#2c3e50")
+           .text("the same teams (PSG & Bayern)");
+       }
+       
+       // Add annotation for diverse leagues
+       const diverseAnnotation = g.append("g")
+         .attr("class", "diverse-annotation")
+         .style("opacity", 0);
+       
+       // Find the Premier League, La Liga, and Serie A data
+       const plData = leagueData.find(d => d.league === "Premier League");
+       const laLigaData = leagueData.find(d => d.league === "La Liga");
+       const serieAData = leagueData.find(d => d.league === "Serie A");
+       
+       if (plData && laLigaData && serieAData) {
+         // Add connecting curve over the diverse leagues
+         const startX = xScale("Premier League");
+         const endX = xScale("Serie A") + xScale.bandwidth();
+         const midX = (startX + endX) / 2;
+         const curveY = Math.min(yScale(plData.count), yScale(laLigaData.count), yScale(serieAData.count)) - 50;
+         
+         const pathData = `M ${startX + xScale.bandwidth()/2} ${yScale(plData.count) - 30} 
+                          Q ${midX} ${curveY - 20} 
+                          ${endX - xScale.bandwidth()/2} ${yScale(serieAData.count) - 30}`;
+         
+         diverseAnnotation.append("path")
+           .attr("d", pathData)
+           .attr("stroke", "#27ae60")
+           .attr("stroke-width", 3)
+           .attr("stroke-dasharray", "5,5")
+           .attr("fill", "none");
+         
+         // Add annotation box for diverse leagues
+         const diverseBox = diverseAnnotation.append("g");
+         const boxX2 = midX - 140;
+         const boxY2 = curveY - 80;
+         
+         diverseBox.append("rect")
+           .attr("x", boxX2)
+           .attr("y", boxY2)
+           .attr("width", 280)
+           .attr("height", 70)
+           .attr("fill", "white")
+           .attr("stroke", "#27ae60")
+           .attr("stroke-width", 2)
+           .attr("rx", 8);
+         
+         diverseBox.append("text")
+           .attr("x", boxX2 + 140)
+           .attr("y", boxY2 + 20)
+           .attr("text-anchor", "middle")
+           .style("font-size", "14px")
+           .style("font-weight", "bold")
+           .style("font-family", "Arial, sans-serif")
+           .style("fill", "#27ae60")
+           .text("Team Diversity");
+         
+         diverseBox.append("text")
+           .attr("x", boxX2 + 140)
+           .attr("y", boxY2 + 40)
+           .attr("text-anchor", "middle")
+           .style("font-size", "12px")
+           .style("font-family", "Arial, sans-serif")
+           .style("fill", "#2c3e50")
+           .text("Top 3 players come from");
+         
+         diverseBox.append("text")
+           .attr("x", boxX2 + 140)
+           .attr("y", boxY2 + 55)
+           .attr("text-anchor", "middle")
+           .style("font-size", "12px")
+           .style("font-family", "Arial, sans-serif")
+           .style("fill", "#2c3e50")
+           .text("different teams across leagues");
+       }
+       
+       // Animate annotations to appear
+       concentratedAnnotation
+         .transition()
+         .duration(800)
+         .style("opacity", 1);
+       
+       setTimeout(() => {
+         diverseAnnotation
+           .transition()
+           .duration(800)
+           .style("opacity", 1);
+       }, 1000);
+       
+       // Add click handlers to hide annotations
+       concentratedAnnotation
+         .style("cursor", "pointer")
+         .on("click", function() {
+           d3.select(this)
+             .transition()
+             .duration(500)
+             .style("opacity", 0)
+             .on("end", function() {
+               d3.select(this).remove();
+             });
+         });
+       
+       diverseAnnotation
+         .style("cursor", "pointer")
+         .on("click", function() {
+           d3.select(this)
+             .transition()
+             .duration(500)
+             .style("opacity", 0)
+             .on("end", function() {
+               d3.select(this).remove();
+             });
+         });
+         
+     }, 2500); // Show annotations after bars are fully animated
+   }
+
+   // Scene 3: Elite player showcase
+   function createScene3(data) {
+     const margin = {top: 120, right: 50, bottom: 80, left: 50};
+     const width = 1400 - margin.left - margin.right;  
+     const height = 700 - margin.top - margin.bottom;  
+
+     const svg = d3.select("#scene1").append("svg").attr("width", 1400).attr("height", 700);
+     const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+     // Get top 10 players by overall rating
+     const top10Players = data
+       .sort((a, b) => b.Overall - a.Overall)
+       .slice(0, 10);
+
+     console.log("Top 10 Players:", top10Players);
+
+     // Add title
+     g.append("text")
+       .attr("x", width / 2)
+       .attr("y", -70)
+       .attr("text-anchor", "middle")
+       .style("font-size", "32px")
+       .style("font-weight", "bold")
+       .style("font-family", "Arial, sans-serif")
+       .style("fill", "#2c3e50")
+       .text("Meet the FIFA 22 Elite");
+
+     // Add subtitle
+     g.append("text")
+       .attr("x", width / 2)
+       .attr("y", -40)
+       .attr("text-anchor", "middle")
+       .style("font-size", "18px")
+       .style("font-family", "Arial, sans-serif")
+       .style("fill", "#7f8c8d")
+       .text("The top 10 highest-rated players in FIFA 22 • Click to explore");
+
+     // Calculate grid layout for player cards
+     const cardsPerRow = 5;
+     const cardWidth = 220; 
+     const cardHeight = 180; 
+     const cardSpacing = 40;
+     
+     const startX = (width - (cardsPerRow * cardWidth + (cardsPerRow - 1) * cardSpacing)) / 2;
+     const startY = 50;
+
+     // Create player cards
+     const playerCards = g.selectAll(".player-card")
+       .data(top10Players)
+       .enter()
+       .append("g")
+       .attr("class", "player-card")
+       .attr("transform", (d, i) => {
+         const row = Math.floor(i / cardsPerRow);
+         const col = i % cardsPerRow;
+         const x = startX + col * (cardWidth + cardSpacing);
+         const y = startY + row * (cardHeight + cardSpacing);
+         return `translate(${x}, ${y})`;
+       })
+       .style("cursor", "pointer")
+       .style("opacity", 0);
+
+     // Add card backgrounds
+     playerCards.append("rect")
+       .attr("width", cardWidth)
+       .attr("height", cardHeight)
+       .attr("rx", 15)
+       .attr("fill", "white")
+       .attr("stroke", "#e1e8ed")
+       .attr("stroke-width", 2)
+       .style("filter", "drop-shadow(0 4px 8px rgba(0,0,0,0.1))");
+
+     // Add player ranking
+     playerCards.append("circle")
+       .attr("cx", 20)
+       .attr("cy", 20)
+       .attr("r", 15)
+       .attr("fill", (d, i) => i < 3 ? ["#FFD700", "#C0C0C0", "#CD7F32"][i] : "#3498db");
+
+     playerCards.append("text")
+       .attr("x", 20)
+       .attr("y", 26)
+       .attr("text-anchor", "middle")
+       .style("font-size", "12px")
+       .style("font-weight", "bold")
+       .style("font-family", "Arial, sans-serif")
+       .style("fill", "white")
+       .text((d, i) => i + 1);
+
+     // Add player names
+     playerCards.append("text")
+       .attr("x", cardWidth / 2)
+       .attr("y", 60)  // Moved down from 50
+       .attr("text-anchor", "middle")
+       .style("font-size", "18px")  // Increased from 16px
+       .style("font-weight", "bold")
+       .style("font-family", "Arial, sans-serif")
+       .style("fill", "#2c3e50")
+       .text(d => d.Name.length > 15 ? d.Name.substring(0, 15) + "..." : d.Name);
+
+     // Add overall rating with prominent display
+     playerCards.append("rect")
+       .attr("x", cardWidth / 2 - 30)  // Increased width
+       .attr("y", 80)  // Moved down from 65
+       .attr("width", 60)  // Increased from 50
+       .attr("height", 35)  // Increased from 30
+       .attr("rx", 5)
+       .attr("fill", d => {
+         if (d.Overall >= 95) return "#e74c3c";
+         if (d.Overall >= 90) return "#f39c12";
+         return "#27ae60";
+       });
+
+     playerCards.append("text")
+       .attr("x", cardWidth / 2)
+       .attr("y", 103)  // Adjusted for new rectangle position
+       .attr("text-anchor", "middle")
+       .style("font-size", "20px")  // Increased from 18px
+       .style("font-weight", "bold")
+       .style("font-family", "Arial, sans-serif")
+       .style("fill", "white")
+       .text(d => d.Overall);
+
+     // Add club name
+     playerCards.append("text")
+       .attr("x", cardWidth / 2)
+       .attr("y", 140)  // Moved down from 115
+       .attr("text-anchor", "middle")
+       .style("font-size", "14px")  // Increased from 12px
+       .style("font-family", "Arial, sans-serif")
+       .style("fill", "#7f8c8d")
+       .text(d => d.Club.length > 20 ? d.Club.substring(0, 20) + "..." : d.Club);
+
+
+
+     // Animate cards in
+     playerCards.transition()
+       .duration(600)
+       .delay((d, i) => i * 100)
+       .style("opacity", 1)
+       .attr("transform", (d, i) => {
+         const row = Math.floor(i / cardsPerRow);
+         const col = i % cardsPerRow;
+         const x = startX + col * (cardWidth + cardSpacing);
+         const y = startY + row * (cardHeight + cardSpacing);
+         return `translate(${x}, ${y})`;
+       });
+
+     // Add click handlers for modal
+     playerCards.on("click", function(event, d) {
+       openPlayerModal(d);
+     });
+
+     // Add hover effects (visual only, no movement)
+     playerCards.on("mouseover", function() {
+       d3.select(this).select("rect")
+         .transition()
+         .duration(200)
+         .attr("stroke", "#3498db")
+         .attr("stroke-width", 3)
+         .style("filter", "drop-shadow(0 8px 25px rgba(52, 152, 219, 0.3))");
+     })
+     .on("mouseout", function() {
+       d3.select(this).select("rect")
+         .transition()
+         .duration(200)
+         .attr("stroke", "#e1e8ed")
+         .attr("stroke-width", 2)
+         .style("filter", "drop-shadow(0 4px 8px rgba(0,0,0,0.1))");
+     });
+
+     // Add instruction text
+     g.append("text")
+       .attr("x", width / 2)
+       .attr("y", height)  // Moved further down from height - 10
+       .attr("text-anchor", "middle")
+       .style("font-size", "14px")
+       .style("font-style", "italic")
+       .style("font-family", "Arial, sans-serif")
+       .style("fill", "#95a5a6")
+       .text("Click on any player card to view detailed statistics and information");
+   }
+
+   // Function to open player modal
+   function openPlayerModal(player) {
+     const modal = document.getElementById('playerModal');
+     const modalContent = document.getElementById('modalContent');
+     
+     // Format player value
+     const formatValue = (value) => {
+       if (value >= 1000000) {
+         return "€" + (value / 1000000).toFixed(1) + "M";
+       } else if (value >= 1000) {
+         return "€" + (value / 1000).toFixed(0) + "K";
+       }
+       return "€" + value;
+     };
+
+     // Create modal content
+     modalContent.innerHTML = `
+       <div style="text-align: center; margin-bottom: 25px;">
+         <h2 style="margin: 0; color: #2c3e50; font-size: 28px;">${player.Name}</h2>
+         <p style="margin: 5px 0; color: #7f8c8d; font-size: 16px;">${player.Club}</p>
+       </div>
+       
+       <div style="display: flex; justify-content: space-around; margin-bottom: 25px;">
+         <div style="text-align: center;">
+           <div style="width: 80px; height: 80px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; margin: 0 auto 10px;">
+             <span style="color: white; font-size: 24px; font-weight: bold;">${player.Overall}</span>
+           </div>
+           <p style="margin: 0; font-weight: bold; color: #2c3e50;">Overall Rating</p>
+         </div>
+         
+         <div style="text-align: center;">
+           <div style="width: 80px; height: 80px; border-radius: 50%; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); display: flex; align-items: center; justify-content: center; margin: 0 auto 10px;">
+             <span style="color: white; font-size: 24px; font-weight: bold;">${player.Age}</span>
+           </div>
+           <p style="margin: 0; font-weight: bold; color: #2c3e50;">Age</p>
+         </div>
+         
+         <div style="text-align: center;">
+           <div style="width: 80px; height: 80px; border-radius: 50%; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); display: flex; align-items: center; justify-content: center; margin: 0 auto 10px;">
+             <span style="color: white; font-size: 24px; font-weight: bold;">${player.Position || 'N/A'}</span>
+           </div>
+           <p style="margin: 0; font-weight: bold; color: #2c3e50;">Position</p>
+         </div>
+       </div>
+       
+       <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+         <h3 style="margin: 0 0 15px 0; color: #2c3e50;">Key Statistics</h3>
+         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+           <div>
+             <p style="margin: 5px 0;"><strong>Market Value:</strong> ${formatValue(player.Value)}</p>
+             <p style="margin: 5px 0;"><strong>Nationality:</strong> ${player.Nationality || 'Unknown'}</p>
+           </div>
+           <div>
+             <p style="margin: 5px 0;"><strong>Height:</strong> ${player.Height || 'Unknown'}</p>
+             <p style="margin: 5px 0;"><strong>Weight:</strong> ${player.Weight || 'Unknown'}</p>
+           </div>
+         </div>
+       </div>
+       
+     `;
+     
+     modal.style.display = 'block';
+   }
+
+   // Helper function to parse financial values (e.g., €107.5M to 107500000)
+   function parseValue(value) {
+     if (!value) return 0; // Handle empty or invalid values
+     let multiplier = 1;
+     if (value.includes("M")) multiplier = 1e6; // Millions
+     if (value.includes("K")) multiplier = 1e3; // Thousands
+     return parseFloat(value.replace(/[^0-9.]/g, "")) * multiplier;
+   }
+ </script>
+</body>
+</html>
